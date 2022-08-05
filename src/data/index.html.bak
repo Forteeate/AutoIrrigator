@@ -1,0 +1,107 @@
+
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+
+        <!-- Required meta tags -->
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+        <!-- Bootstrap CSS -->
+        <link rel="stylesheet" href="bootstrap.min.css" media="screen"> 
+
+        <script src="jquery.min.js"></script>
+        <script src="bootstrap.min.js"></script>
+        
+
+    </head>
+
+  <body>
+	
+
+    <div class="jumbotron jumbotron-fluid" style="text-align:center">
+      <h1 class="text-primary">The AutoIrrigator</h1>
+    </div>
+	<div class="container-lg" style="text-align:Left">
+	<p>Current Time: <strong><span id="currentTime"></span></strong>
+	
+	 LED state: <strong><span id="output"></span></strong></p>
+	</div>
+    <!-- Buttons ================================================== -->
+    <div class="container" style="text-align:center">
+        <h5>---  Blue LED  ---</h5>
+        <div class="btn-group-lg " role="group" aria-label="LED Buttons">
+            <button type="button btn-lg" class="btn btn-primary btn-lg" id="led1" data-toggle="buttons">1s</button>
+            <button type="button btn-lg" class="btn btn-secondary btn-lg" data-toggle="buttons" id="led2">2s</button>
+        </div>
+        <p>
+        <div class="btn-group-lg" role="group" aria-label="Relay Buttons">
+            <button type="button btn-lg" class="btn btn-warning btn-lg" data-toggle="buttons" id="led3">5s</button>
+            <button type="button btn-lg" class="btn btn-danger btn-lg" data-toggle="buttons"  id="led4">10s</button>
+        </div>
+    </div>
+
+    <div class="container" style="text-align:center">
+      <p>
+        <p>
+        <button type="button btn-lg" class="btn btn-success btn-block" data-toggle="buttons" id="turnoff">Turn Off</button>
+        </p>
+      </p>
+    </div>
+	
+	<script type="text/javascript">
+		const sendData = async (duration) => {
+		
+			const objToSend = {
+				duration: duration
+			
+			}
+			
+			const response = await fetch("/endpoint/", {
+				method: "PUT",
+				headers: {
+					"Content-Type": "application/json"
+				},
+				body: JSON.stringify(objToSend)
+				
+				
+			});
+			const jsonResponse = await response.json();
+			
+		}
+		
+		
+			const getStatus = async () => {
+			
+			const response = await fetch("/status",{
+				method: "GET",
+				headers:{
+					Accept: "application/json"
+					}
+				});
+			const jsonData = await response.json();
+							
+				if(jsonData["LEDStatus"] == "1"){
+				
+				document.getElementById('output').innerHTML = "ON";
+				
+				}else{
+				document.getElementById('output').innerHTML = "OFF";
+				}
+				document.getElementById('currentTime').innerHTML = jsonData["currentTime"];
+			};
+	
+	document.getElementById('led1').onclick = function(){sendData('1')};
+	document.getElementById('led2').onclick = function(){sendData('2')};
+	document.getElementById('led3').onclick = function(){sendData('5')};
+	document.getElementById('led4').onclick = function(){sendData('10')};
+	document.getElementById('turnoff').onclick = function(){sendData('0')};
+	setInterval(function(){getStatus()}, 1000);
+	
+	
+	</script>
+	
+	
+
+  </body>
+</html>
