@@ -10,6 +10,8 @@
 #include "time.h"
 #include <analogWrite.h>
 
+
+
 #define ledPin 2
 
 int previousLEDStatus;
@@ -25,6 +27,7 @@ unsigned long int currentMs;
 unsigned long int prevMs;
 unsigned long int durationMs = 0;
 int LEDstatus = 0;
+
 const char* filename = "/data.json";
 
 
@@ -36,18 +39,26 @@ TaskHandle_t Task1;
 // Create AsyncWebServer object on port 80
 AsyncWebServer server(80);
 
-int readDurationFromFile(const char* filename){
+DynamicJsonDocument recoverDataFromFile(const char* filename){
   //Read JSON file
-  File file = SPIFFS.open(filename);
-  if(file){
+  File file = SPIFFS.open("/data.json", "r");
+  if(!file){
+  Serial.println("Failed to read file!");
+  }
     //Deserialise JSON
   DynamicJsonDocument doc(1024);
   deserializeJson(doc, file);
-  auto duration = doc["duration"].as<int>();
+
+  Serial.print("Read data from file:");
+  Serial.println(file);
+
   file.close();
-  return duration;
-  }
+  return doc;
+  
+  
 }
+
+void Task1code( void * parameter);
 
 void setTimezone(String timezone){
   Serial.printf("  Setting Timezone to %s\n",timezone.c_str());
@@ -58,7 +69,7 @@ void setTimezone(String timezone){
 void initTime(String timezone){
   struct tm timeinfo;
 
-  configTime(0, 0, "pool.ntp.org");    // First connect to NTP server, with 0 TZ offset
+  configTime(0, 0, "time.google.com");    // First connect to NTP server, with 0 TZ offset
   if(!getLocalTime(&timeinfo)){
     Serial.println("  Failed to obtain time");
     return;
@@ -79,24 +90,25 @@ void initTime(String timezone){
   Serial.println(currentTime);
 }
 
-void writeDataToFile(const char* filename, int outputData, String dataLabel){
+void writeDataToFile(const char* filename, int outputData1, String dataLabel1,
+ int outputData2, String dataLabel2, int outputData3, String dataLabel3){
   File outFile = SPIFFS.open(filename, "w");
   DynamicJsonDocument doc(1024);
-  doc[dataLabel] = outputData;
-  serializeJson(doc,outFile);
+  doc["interval"] = outputData1;
+  doc["time"] = outputData2;
+  doc["volume"] = outputData3;
+  serializeJson(doc, outFile);
+
+  Serial.print("Wrote data to file:");
+  Serial.println(outFile);
+  Serial.print(dataLabel1);
+  Serial.println(outputData1);
+  Serial.print(dataLabel2);
+  Serial.println(outputData2);
+  Serial.print(dataLabel3);
+  Serial.println(outputData3);
   outFile.close();
-}
-
-void dataProcessor(String jsonData){
-
-  DynamicJsonDocument doc(1024);
-  deserializeJson(doc, jsonData);
-
-  int duration = doc["duration"];
-
-
-    durationMs = duration*1000;
-    writeDataToFile(filename, duration, "Duration");  
+  
 }
 
 void notFound(AsyncWebServerRequest *request)
@@ -140,6 +152,7 @@ class Motor
   public:
     Motor(int iPwmOut, int iDir1, int iDir2);
     void drive(int iSpeed);
+    void pump(int volume);
     int iPwmOutPort, iDir1Port, iDir2Port, iCurrentSpeed;
 };
 
@@ -180,10 +193,58 @@ void Motor::drive(int iSpeed){
 //    }
 //  }
 }
+
+void Motor::pump(int volume){ //"volume" is volume of water to pump in ml
+    int pumpDuration = volume * 1.31;
+    this->drive(255);
+    delay(pumpDuration*1000);
+    this->drive(0);
+}
+
+class Plant
+{
+  public:
+    Plant(int interval, int time, int volume, int prevTime);
+    void dataProcessor(String jsonData);
+    int wateringInterval, wateringTime, waterVolume, lastWaterTime;
+};
+
+Plant::Plant(int interval, int time, int volume, int prevTime)
+{ 
+  wateringInterval = interval;
+  wateringTime = time;
+  waterVolume = volume;
+  lastWaterTime = prevTime;
+  
+}
+
+void Plant::dataProcessor(String jsonData){
+
+  DynamicJsonDocument doc(1024);
+  deserializeJson(doc, jsonData);
+
+  int waterInterval = doc["interval"]; //interval in days
+  int waterTime = doc["time"]; //time of day in 24 hour format, eg "24" = midnight
+  int waterVol = doc["volume"]; //volume in ml
+
+  
+  this->wateringInterval = waterInterval;
+  this->wateringTime = waterTime;
+  this->waterVolume = waterVol;
+
+  writeDataToFile(filename, waterInterval, "wateringInterval",
+    waterTime, "wateringTime", waterVol, "wateringVolume"); 
+}
+
+Plant plant1(0, 0, 0, 0);
 Motor waterPump(22, 32, 33);
 
-
 void setup(){
+
+  
+
+
+
   // Serial port for debugging purposes
   Serial.begin(115200);
 
@@ -202,69 +263,84 @@ void setup(){
     delay(1000);
     Serial.println("Connecting to WiFi..");
   }
-
   // Print ESP Local IP Address
   Serial.println(WiFi.localIP());
   
   // Route for root / web page
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
   request->send(SPIFFS, "/index.html", String(), false);
-});
-server.on("/bootstrap.min.css", HTTP_GET, [](AsyncWebServerRequest *request){
-  request->send(SPIFFS, "/bootstrap.min.css","text/css");
-});
-server.on("/jquery.min.js", HTTP_GET, [](AsyncWebServerRequest *request){
-  request->send(SPIFFS, "/jquery.min.js","text/css");
-});
-server.on("/bootstrap.min.js", HTTP_GET, [](AsyncWebServerRequest *request){
-  request->send(SPIFFS, "/bootstrap.min.js","text/css");
-});
+  });
+  server.on("/bootstrap.min.css", HTTP_GET, [](AsyncWebServerRequest *request){
+    request->send(SPIFFS, "/bootstrap.min.css","text/css");
+  });
+  server.on("/jquery.min.js", HTTP_GET, [](AsyncWebServerRequest *request){
+    request->send(SPIFFS, "/jquery.min.js","text/css");
+  });
+  server.on("/bootstrap.min.js", HTTP_GET, [](AsyncWebServerRequest *request){
+    request->send(SPIFFS, "/bootstrap.min.js","text/css");
+  });
 
-server.on("/status", HTTP_GET, [](AsyncWebServerRequest *request){
+  server.on("/status", HTTP_GET, [](AsyncWebServerRequest *request){
 
-  StaticJsonDocument<200> doc;
-  doc["LEDStatus"] = String(LEDstatus);
-  doc["currentTime"] = currentTime;
-  String response;
-  serializeJson(doc, response);
-  
-  request->send(200, "application/json", response);
-/*  Serial.print("STATUS: ");
-  Serial.println(response);
-*/
-});
+    StaticJsonDocument<200> doc;
+    doc["LEDStatus"] = String(LEDstatus);
+    doc["currentTime"] = currentTime;
+    doc["lastWaterTime"] = plant1.lastWaterTime;
+    doc["currentTimeInterval"] = plant1.wateringInterval;
+    doc["currentWaterTime"] = plant1.wateringTime;
+    doc["currentWaterVolume"] = plant1.waterVolume;
+    
 
-AsyncCallbackJsonWebHandler *handler = new AsyncCallbackJsonWebHandler("/endpoint/", [](AsyncWebServerRequest *request, JsonVariant &json) {
-  StaticJsonDocument<200> data;
-  
-    data = json.as<JsonObject>();
-   
     String response;
-    serializeJson(data, response);
+    serializeJson(doc, response);
+    
     request->send(200, "application/json", response);
+  /*  Serial.print("STATUS: ");
+    Serial.println(response);
+  */
+  });
 
-    newJSON = response;
-    newJSONFlag = 1;
-});
+  AsyncCallbackJsonWebHandler *handler = new AsyncCallbackJsonWebHandler("/endpoint/", [](AsyncWebServerRequest *request, JsonVariant &json) {
+    StaticJsonDocument<200> data;
+    
+      data = json.as<JsonObject>();
+    
+      String response;
+      serializeJson(data, response);
+      request->send(200, "application/json", response);
+
+      newJSON = response;
+      newJSONFlag = 1;
+  });
 
 
-server.addHandler(handler);
-server.onNotFound(notFound);
-// Start server
-server.begin();
+  server.addHandler(handler);
+  server.onNotFound(notFound);
+  // Start server
+  server.begin();
 
-durationMs = 1000*readDurationFromFile(filename); //initialise duration
-initTime("GMT0BST,M3.5.0/1,M10.5.0"); //initialise timezone
 
-xTaskCreatePinnedToCore(
-      Task1code, /* Function to implement the task */
-      "Task1", /* Name of the task */
-      10000,  /* Stack size in words */
-      NULL,  /* Task input parameter */
-      0,  /* Priority of the task */
-      &Task1,  /* Task handle. */
-      0); /* Core where the task should run */
+  initTime("GMT0BST,M3.5.0/1,M10.5.0"); //initialise timezone
+
+  DynamicJsonDocument oldData = recoverDataFromFile(filename); //initialise values from file
+    plant1.wateringInterval = oldData["interval"];
+    plant1.wateringTime = oldData["time"];
+    plant1.waterVolume = oldData["volume"];
+    //plant1.lastWaterTime = oldData["prevTime"];
+    
+  xTaskCreatePinnedToCore(
+        Task1code, /* Function to implement the task */
+        "Task1", /* Name of the task */
+        10000,  /* Stack size in words */
+        NULL,  /* Task input parameter */
+        0,  /* Priority of the task */
+        &Task1,  /* Task handle. */
+        0); /* Core where the task should run */
 }
+
+
+
+
 void Task1code( void * parameter) {
   for(;;) {
      currentMs = millis();
@@ -287,13 +363,11 @@ void Task1code( void * parameter) {
   updateStatus(LEDstatus);
 
   if(newJSONFlag == 1){
-      dataProcessor(newJSON);
+      plant1.dataProcessor(newJSON);
       newJSONFlag = 0;
   }
   
   }
 }
-  
-void loop() {
-  
-}
+
+void loop() {}

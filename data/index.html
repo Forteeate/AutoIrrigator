@@ -1,0 +1,183 @@
+
+<!DOCTYPE html>
+<html lang="en">
+    <head>
+
+        <!-- Required meta tags -->
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+        <!-- Bootstrap CSS -->
+        <link rel="stylesheet" href="bootstrap.min.css" media="screen"> 
+
+        <script src="jquery.min.js"></script>
+        <script src="bootstrap.min.js"></script>
+        
+
+    </head>
+
+  <body>
+	
+
+    <div class="jumbotron jumbotron-fluid" style="text-align:center">
+      <h1 class="text-primary">The AutoIrrigator</h1>
+    </div>
+	<div class="container-lg" style="text-align:Left">
+	<p>Current Time: <strong><span id="currentTime"></span></strong>
+	
+	 Last Water: <strong><span id="lastWaterTime"></span></strong>
+
+	 Pump State: <strong><span id="output"></span></strong></p>
+	</div>
+    <!-- Buttons ================================================== -->
+	<div class="container text-center">
+		<br>
+	<div class="row">
+		<div class="container-sm-8">
+
+			<h5>---  Current Settings ---</h5>
+			<p>Every <strong><span id="currentTimeInterval"></span></strong>
+				day(s), at <strong><span id="currentWaterTime"></span></strong>:00,
+				pump <strong><span id="currentWaterVolume"></span></strong>ml of water. :)</p>
+		</div>
+		
+		<div class="container-sm-8">
+			<p></p>
+			<h5>---  Time Interval ---</h5>
+			<div class="btn-group" role="group" aria-label="Time Interval Selection">
+				<input type="radio" class="btn-check" name="intervalbtns" id="intervalbtn1" value="1" autocomplete="off">
+				<label class="btn btn-outline-primary" for="intervalbtn1">Day</label>
+			
+				<input type="radio" class="btn-check" name="intervalbtns" id="intervalbtn2" value="2" autocomplete="off">
+				<label class="btn btn-outline-primary" for="intervalbtn2">Two Days</label>
+			
+				<input type="radio" class="btn-check" name="intervalbtns" id="intervalbtn3" value="3" autocomplete="off">
+				<label class="btn btn-outline-primary" for="intervalbtn3">Three Days</label>
+
+				<input type="radio" class="btn-check" name="intervalbtns" id="intervalbtn4" value="7" autocomplete="off">
+				<label class="btn btn-outline-primary" for="intervalbtn4">Week</label>
+			</div>
+		
+		</div>
+		
+		<div class="container-sm-8" >
+			<p></p>
+			<h5>---  Watering Time ---</h5>
+				<div class="btn-group" role="group" aria-label="Watering Time Selection">
+				<input type="radio" class="btn-check" name="timebtns" id="timebtn1" value="6" autocomplete="off">
+				<label class="btn btn-outline-primary" for="timebtn1">6am</label>
+			
+				<input type="radio" class="btn-check" name="timebtns" id="timebtn2" value="12" autocomplete="off">
+				<label class="btn btn-outline-primary" for="timebtn2">Midday</label>
+			
+				<input type="radio" class="btn-check" name="timebtns" id="timebtn3" value="18" autocomplete="off">
+				<label class="btn btn-outline-primary" for="timebtn3">6pm</label>
+
+				<input type="radio" class="btn-check" name="timebtns" id="timebtn4" value="20" autocomplete="off">
+				<label class="btn btn-outline-primary" for="timebtn4">8pm</label>
+			</div>
+		
+		</div>
+		
+		<div class="container-sm-8" >
+			<p></p>
+			<h5>---  Water Volume ---</h5>
+			<div class="input-group mb-3">
+				<input type="number" class="form-control" placeholder="Amount of Water" aria-label="Water Volume" id="volumeInput">
+				<span class="input-group-text" for="volumeInput">ml</span>
+			</div>
+		</div>
+	</div>
+	</div>
+    <div class="container-lg" style="text-align:center">
+      <p>
+        <p>
+        <button type="button btn-lg" class="btn btn-success btn-block" data-toggle="buttons" id="submit">Submit</button>
+        </p>
+      </p>
+    </div>
+	
+	<script type="text/javascript">
+		
+		const sendData = async (interval, time, volume) => {
+		
+			const objToSend = {
+				interval: interval,
+				time: time,
+				volume: volume
+			
+			}
+			
+			const response = await fetch("/endpoint/", {
+				method: "PUT",
+				headers: {
+					"Content-Type": "application/json"
+				},
+				body: JSON.stringify(objToSend)
+				
+				
+			});
+			const jsonResponse = await response.json();
+		}
+		
+		
+			const getStatus = async () => {
+			
+			const response = await fetch("/status",{
+				method: "GET",
+				headers:{
+					Accept: "application/json"
+					}
+				});
+			const jsonData = await response.json();
+							
+				if(jsonData["LEDStatus"] == "1"){
+				
+				document.getElementById('output').innerHTML = "ON";
+				
+				}else{
+				document.getElementById('output').innerHTML = "OFF";
+				}
+				document.getElementById('currentTime').innerHTML = jsonData["currentTime"];
+				document.getElementById('lastWaterTime').innerHTML = jsonData["lastWaterTime"];
+				document.getElementById('currentTimeInterval').innerHTML = jsonData["currentTimeInterval"];
+				document.getElementById('currentWaterTime').innerHTML = jsonData["currentWaterTime"];
+				document.getElementById('currentWaterVolume').innerHTML = jsonData["currentWaterVolume"];
+			};
+			
+			
+	    
+        	
+	const intervalButtons = document.querySelectorAll('input[name="intervalbtns"]');
+	const timeButtons = document.querySelectorAll('input[name="timebtns"]');
+	let selectedTime;
+	let selectedInterval;	
+
+	document.getElementById('submit').onclick = function(){
+	            
+		for (const intervalButton of intervalButtons) {
+			if (intervalButton.checked) {
+				selectedInterval = intervalButton.value;
+				break;
+			}
+		}
+		
+		for (const timeButton of timeButtons) {
+			if (timeButton.checked) {
+				selectedTime = timeButton.value;
+				break;
+			}
+		}
+
+		sendData(selectedInterval, selectedTime, (document.getElementById('volumeInput').value))
+	
+	};
+
+	setInterval(function(){getStatus()}, 1000);
+
+	</script>
+	
+	
+
+  </body>
+</html>
