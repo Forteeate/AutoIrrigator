@@ -7,9 +7,9 @@
 #include <SPIFFS.h>
 #include <ArduinoJson.h>
 #include <ESPAsyncWebServer.h>
-#include "time.h"
+#include <Time.h>
 #include <analogWrite.h>
-
+#include <TimeAlarms.h>
 
 
 #define ledPin 2
@@ -145,8 +145,6 @@ void updateStatus(int currentLEDStatus){
   
 }
 
-
-
 class Motor
 {
   public:
@@ -193,7 +191,7 @@ void Motor::drive(int iSpeed){
 //    }
 //  }
 }
-
+  
 void Motor::pump(int volume){ //"volume" is volume of water to pump in ml
     int pumpDuration = volume * 1.31;
     this->drive(255);
@@ -201,12 +199,16 @@ void Motor::pump(int volume){ //"volume" is volume of water to pump in ml
     this->drive(0);
 }
 
+Motor waterPump(22, 32, 33);
+
 class Plant
 {
   public:
     Plant(int interval, int time, int volume, int prevTime);
-    void dataProcessor(String jsonData);
-    int wateringInterval, wateringTime, waterVolume, lastWaterTime;
+    //void dataProcessor(String jsonData);
+    //void waterPlants();
+    int wateringInterval, wateringTime, waterVolume, lastWaterTime, daysTillWater;
+    AlarmID_t currentAlarm;
 };
 
 Plant::Plant(int interval, int time, int volume, int prevTime)
@@ -218,7 +220,44 @@ Plant::Plant(int interval, int time, int volume, int prevTime)
   
 }
 
-void Plant::dataProcessor(String jsonData){
+
+
+/* void Plant::waterPlants(){
+
+  if(daysTillWater == 0){
+    waterPump.pump(waterVolume);
+
+    Serial.print("Watered Plants Succesfully: ");
+    Serial.print(waterVolume);
+    Serial.println("ml");
+
+    currentAlarm = Alarm.alarmOnce(wateringTime,0,0, std::bind(waterPlants, this));  //Set alarm for next watering  
+  }
+  else{
+    daysTillWater--;
+  }
+
+} */
+
+Plant plant1(0, 0, 0, 0);
+
+void waterPlants(){
+     if(plant1.daysTillWater == 0){
+    waterPump.pump(plant1.waterVolume);
+
+    Serial.print("Watered Plants Succesfully: ");
+    Serial.print(plant1.waterVolume);
+    Serial.println("ml");
+
+    plant1.currentAlarm = Alarm.alarmOnce(plant1.wateringTime,0,0, waterPlants);  //Set alarm for next watering  
+  }
+  else{
+    plant1.daysTillWater--;
+  }
+
+  }
+
+void dataProcessor(String jsonData){
 
   DynamicJsonDocument doc(1024);
   deserializeJson(doc, jsonData);
@@ -228,22 +267,19 @@ void Plant::dataProcessor(String jsonData){
   int waterVol = doc["volume"]; //volume in ml
 
   
-  this->wateringInterval = waterInterval;
-  this->wateringTime = waterTime;
-  this->waterVolume = waterVol;
+  plant1.wateringInterval = waterInterval;
+  plant1.wateringTime = waterTime;
+  plant1.waterVolume = waterVol;
+  plant1.daysTillWater = (waterInterval-1);
+   
+  Alarm.disable(plant1.currentAlarm);
+  plant1.currentAlarm = Alarm.alarmOnce(plant1.wateringTime,0,0, waterPlants);  //Set alarm for next watering  
 
   writeDataToFile(filename, waterInterval, "wateringInterval",
     waterTime, "wateringTime", waterVol, "wateringVolume"); 
 }
 
-Plant plant1(0, 0, 0, 0);
-Motor waterPump(22, 32, 33);
-
 void setup(){
-
-  
-
-
 
   // Serial port for debugging purposes
   Serial.begin(115200);
@@ -327,6 +363,7 @@ void setup(){
     plant1.wateringTime = oldData["time"];
     plant1.waterVolume = oldData["volume"];
     //plant1.lastWaterTime = oldData["prevTime"];
+    plant1.currentAlarm = Alarm.alarmOnce(plant1.wateringTime,0,0, waterPlants);  //Set alarm for next watering  
     
   xTaskCreatePinnedToCore(
         Task1code, /* Function to implement the task */
@@ -343,31 +380,17 @@ void setup(){
 
 void Task1code( void * parameter) {
   for(;;) {
-     currentMs = millis();
-  if((durationMs - (currentMs-prevMs)) > 0 && (durationMs - (currentMs-prevMs)) < 100000){
-    durationMs = durationMs - (currentMs-prevMs);
-    prevMs = currentMs;
-    digitalWrite(ledPin, HIGH);
-    waterPump.drive(255);
-    LEDstatus = 1;
-  }
-  
-  else{
-    durationMs = 0;
-    prevMs = currentMs;
-    digitalWrite(ledPin, LOW);
-    waterPump.drive(0);
-    LEDstatus = 0;
-  }
-  
+     
   updateStatus(LEDstatus);
 
   if(newJSONFlag == 1){
-      plant1.dataProcessor(newJSON);
+      dataProcessor(newJSON);
       newJSONFlag = 0;
   }
   
   }
+
+  Alarm.delay(0);
 }
 
 void loop() {}
