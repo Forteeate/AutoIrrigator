@@ -3,7 +3,7 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include <AsyncTCP.h>
-#include "AsyncJson.h"
+#include <AsyncJson.h>
 #include <SPIFFS.h>
 #include <ArduinoJson.h>
 #include <ESPAsyncWebServer.h>
@@ -31,7 +31,7 @@ int LEDstatus = 0;
 const char* filename = "/data.json";
 
 
-// Replace with your network credentials
+// Network credentials
 const char* ssid = "VM1480773";
 const char* password = "p7mTsjnqknxx";
 
@@ -218,6 +218,7 @@ Plant::Plant(int interval, int time, int volume, int prevTime)
   waterVolume = volume;
   lastWaterTime = prevTime;
   
+  
 }
 
 
@@ -239,7 +240,7 @@ Plant::Plant(int interval, int time, int volume, int prevTime)
 
 } */
 
-Plant plant1(0, 0, 0, 0);
+Plant plant1(2, 12, 200, 0);
 
 void waterPlants(){
      if(plant1.daysTillWater == 0){
@@ -250,6 +251,7 @@ void waterPlants(){
     Serial.println("ml");
 
     plant1.currentAlarm = Alarm.alarmOnce(plant1.wateringTime,0,0, waterPlants);  //Set alarm for next watering  
+    plant1.daysTillWater = (plant1.wateringInterval - 1);
   }
   else{
     plant1.daysTillWater--;
@@ -262,21 +264,27 @@ void dataProcessor(String jsonData){
   DynamicJsonDocument doc(1024);
   deserializeJson(doc, jsonData);
 
-  int waterInterval = doc["interval"]; //interval in days
-  int waterTime = doc["time"]; //time of day in 24 hour format, eg "24" = midnight
-  int waterVol = doc["volume"]; //volume in ml
+  if(doc["waterNowvolume"] != 0){
+    waterPump.pump(doc["waterNowvolume"]);
+  }
+  else if(doc["volume"] != 0){
 
-  
-  plant1.wateringInterval = waterInterval;
-  plant1.wateringTime = waterTime;
-  plant1.waterVolume = waterVol;
-  plant1.daysTillWater = (waterInterval-1);
-   
-  Alarm.disable(plant1.currentAlarm);
-  plant1.currentAlarm = Alarm.alarmOnce(plant1.wateringTime,0,0, waterPlants);  //Set alarm for next watering  
+    int waterInterval = doc["interval"]; //interval in days
+    int waterTime = doc["time"]; //time of day in 24 hour format, eg "24" = midnight
+    int waterVol = doc["volume"]; //volume in ml
 
-  writeDataToFile(filename, waterInterval, "wateringInterval",
-    waterTime, "wateringTime", waterVol, "wateringVolume"); 
+    
+    plant1.wateringInterval = waterInterval;
+    plant1.wateringTime = waterTime;
+    plant1.waterVolume = waterVol;
+    plant1.daysTillWater = (waterInterval-1);
+    
+    Alarm.disable(plant1.currentAlarm);
+    plant1.currentAlarm = Alarm.alarmOnce(plant1.wateringTime,0,0, waterPlants);  //Set alarm for next watering  
+
+    writeDataToFile(filename, waterInterval, "wateringInterval",
+      waterTime, "wateringTime", waterVol, "wateringVolume"); 
+  }
 }
 
 void setup(){

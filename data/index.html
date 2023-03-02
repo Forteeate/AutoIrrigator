@@ -35,7 +35,7 @@
 	<div class="row">
 		<div class="container-sm-8">
 
-			<h5>---  Current Settings ---</h5>
+			<h5>---  Scheduled Watering ---</h5>
 			<p>Every <strong><span id="currentTimeInterval"></span></strong>
 				day(s), at <strong><span id="currentWaterTime"></span></strong>:00,
 				pump <strong><span id="currentWaterVolume"></span></strong>ml of water. :)</p>
@@ -88,14 +88,31 @@
 			</div>
 		</div>
 	</div>
-	</div>
+	
     <div class="container-lg" style="text-align:center">
       <p>
         <p>
-        <button type="button btn-lg" class="btn btn-success btn-block" data-toggle="buttons" id="submit">Submit</button>
+        <button type="button btn-lg" class="btn btn-primary btn-block" data-toggle="buttons" id="submit">Submit</button>
         </p>
       </p>
     </div>
+	<div class="container-sm-8" >
+		<p></p>
+		<h5>---  Water Now ---</h5>
+		<div class="input-group mb-3">
+			<input type="number" class="form-control" placeholder="Amount of Water" aria-label="Water Volume" id="waterNowVol">
+			<span class="input-group-text" for="waterNowVol">ml</span>
+		</div>
+	</div>
+	<div class="container-lg" style="text-align:center">
+		<p>
+		  <p>
+		  <button type="button btn-lg" class="btn btn-secondary btn-block" data-toggle="buttons" id="waterNowBtn">Water Now</button>
+		  </p>
+		</p>
+	  </div>
+</div>
+	
 	
 	<script type="text/javascript">
 		
@@ -104,7 +121,8 @@
 			const objToSend = {
 				interval: interval,
 				time: time,
-				volume: volume
+				volume: volume,
+				waterNowvolume: 0
 			
 			}
 			
@@ -119,6 +137,25 @@
 			});
 			const jsonResponse = await response.json();
 		}
+
+		const sendWaterNowData = async (waterNowvolume) => {
+		
+		const objToSend = {
+			waterNowvolume: waterNowvolume
+		
+		}
+		
+		const response = await fetch("/endpoint/", {
+			method: "PUT",
+			headers: {
+				"Content-Type": "application/json"
+			},
+			body: JSON.stringify(objToSend)
+			
+			
+		});
+		const jsonResponse = await response.json();
+	}
 		
 		
 			const getStatus = async () => {
@@ -173,11 +210,12 @@
 	
 	};
 
+	document.getElementById('waterNowBtn').onclick =  sendWaterNowData((document.getElementById('volumeInput').value))
+
+
 	setInterval(function(){getStatus()}, 1000);
 
 	</script>
 	
-	
-
   </body>
 </html>

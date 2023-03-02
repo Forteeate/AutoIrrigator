@@ -19,6 +19,8 @@
     "c:/Users/timot/OneDrive/Documents/PlatformIO/Projects/AutoIrrigator/include",
     "c:/Users/timot/OneDrive/Documents/PlatformIO/Projects/AutoIrrigator/src",
     "C:/Users/timot/.platformio/packages/framework-arduinoespressif32/libraries/SPIFFS/src",
+    "c:/Users/timot/OneDrive/Documents/PlatformIO/Projects/AutoIrrigator/.pio/libdeps/esp32dev/TimeAlarms",
+    "c:/Users/timot/OneDrive/Documents/PlatformIO/Projects/AutoIrrigator/.pio/libdeps/esp32dev/Time",
     "c:/Users/timot/OneDrive/Documents/PlatformIO/Projects/AutoIrrigator/.pio/libdeps/esp32dev/ESP32 AnalogWrite/src",
     "c:/Users/timot/OneDrive/Documents/PlatformIO/Projects/AutoIrrigator/.pio/libdeps/esp32dev/ESPAsyncWebServer-esphome/src",
     "C:/Users/timot/.platformio/packages/framework-arduinoespressif32/libraries/WiFi/src",
